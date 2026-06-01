@@ -152,8 +152,8 @@
     const my = mouseY * renderH;
     const effect = prefersReducedMotion ? 0 : intensity;
     const minDim = Math.min(renderW, renderH);
-    const bloomRadius = minDim * 0.21;
-    const coreRadius = minDim * 0.08;
+    const bloomRadius = minDim * 0.105;
+    const coreRadius = minDim * 0.04;
     const spin = spinAngle;
 
     const imageData = ctx.createImageData(renderW, renderH);
