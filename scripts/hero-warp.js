@@ -19,7 +19,7 @@
   ];
 
   const renderScale = isCoarse ? 0.26 : 0.38;
-  const ANGLE_BINS = 32;
+  const ANGLE_BINS = 64;
 
   /** @type {Map<number, { x: number, y: number, lastX: number, lastY: number }>} */
   const pointers = new Map();
@@ -30,7 +30,11 @@
   let heroRect = hero.getBoundingClientRect();
   let intensity = 0;
   let targetIntensity = 0;
+  let pressBoost = 0;
+  let targetPressBoost = 0;
+  let pressedCount = 0;
   let spinAngle = 0;
+  let animTime = 0;
   let rafId = 0;
   let dirty = false;
   let drawing = false;
@@ -102,7 +106,7 @@
       const angle = (b / ANGLE_BINS) * Math.PI * 2;
       const hue =
         ((angle * 57.2958 + spin * 57.2958 + 180) % 360 + 360) % 360;
-      const rgb = hslToRgb(hue, 0.95, 0.62);
+      const rgb = hslToRgb(hue, 0.88, 0.66);
       const i = b * 3;
       accentTable[i] = rgb.r;
       accentTable[i + 1] = rgb.g;
@@ -201,12 +205,13 @@
     const effect = prefersReducedMotion ? 0 : intensity;
     const data = imageData.data;
     const minDim = Math.min(renderW, renderH);
-    const bloomR = minDim * 0.184;
+    const pulse = prefersReducedMotion ? 1 : 1 + 0.12 * Math.sin(animTime * 2.4);
+    const bloomR = minDim * 0.16 * pulse;
     const bloomRSq = bloomR * bloomR;
-    const coreRSq = (minDim * 0.07) ** 2;
-    const spin = spinAngle;
-    const skipDistSq = bloomRSq * 6.25;
-    const warpBlend = 0.35;
+    const coreRSq = (minDim * 0.06) ** 2;
+    const spin = spinAngle + animTime * 0.55;
+    const skipDistSq = bloomRSq * 4.8;
+    const warpBlend = 0.15;
     const invWarpBlend = 1 - warpBlend;
     const denom = Math.max(1, renderW - 1);
 
@@ -273,46 +278,68 @@
           const core = Math.exp(-distSq / coreRSq) * effect;
           const len = dist || 1;
           const warpPush =
-            bloom * 50 + Math.max(0, Math.sin(dist * 0.12 - spin)) * bloom * 10;
+            bloom * 58 +
+            Math.max(0, Math.sin(dist * 0.1 - spin)) * bloom * 8;
           totalWarp += (dx / len) * warpPush;
 
           const angle = Math.atan2(dy, dx);
-          const bin =
-            (((angle / Math.PI + 1) * 0.5 * ANGLE_BINS) | 0) % ANGLE_BINS;
-          const ai = bin * 3;
-          const ar = accentTable[ai];
-          const ag = accentTable[ai + 1];
-          const ab = accentTable[ai + 2];
+          const binF = ((angle / Math.PI + 1) * 0.5 * ANGLE_BINS) % ANGLE_BINS;
+          const bin0 = binF | 0;
+          const bin1 = (bin0 + 1) % ANGLE_BINS;
+          const bu = binF - bin0;
+          const i0 = bin0 * 3;
+          const i1 = bin1 * 3;
+          const ar = accentTable[i0] * (1 - bu) + accentTable[i1] * bu;
+          const ag = accentTable[i0 + 1] * (1 - bu) + accentTable[i1 + 1] * bu;
+          const ab = accentTable[i0 + 2] * (1 - bu) + accentTable[i1 + 2] * bu;
 
           const xi = x / denom;
-          const chroma = bloom * 0.07;
-          const tr = gradR[lutIndex(xi - chroma)];
-          const tg = gradG[lutIndex(xi)];
-          const tb = gradB[lutIndex(xi + chroma)];
+          const softBloom = bloom * bloom * (3 - 2 * bloom);
+          const baseC = sampleGradient(xi);
+          let nr = baseC.r;
+          let ng = baseC.g;
+          let nb = baseC.b;
 
-          let nr = tr + (ar - tr) * bloom * 0.75;
-          let ng = tg + (ag - tg) * bloom * 0.75;
-          let nb = tb + (ab - tb) * bloom * 0.75;
+          const colorMix = softBloom * 0.72;
+          nr += (ar - nr) * colorMix;
+          ng += (ag - ng) * colorMix;
+          nb += (ab - nb) * colorMix;
 
-          const brighten = bloom * 0.55 + core * 0.45;
+          const brighten =
+            softBloom * (0.68 + pressBoost * 0.1) + core * (0.58 + pressBoost * 0.08);
           nr += (255 - nr) * brighten;
           ng += (255 - ng) * brighten;
           nb += (255 - nb) * brighten;
 
+          if (pressBoost > 0) {
+            const radialT = Math.min(1, dist / (bloomR * 1.1));
+            const smoothT = radialT * radialT * (3 - 2 * radialT);
+            const sweep = smoothT * 0.7 + 0.3 * xi;
+            const pg = sampleGradient(sweep);
+            const pressMix = pressBoost * softBloom * 0.38 * (1 - smoothT * 0.5);
+            nr += (pg.r - nr) * pressMix;
+            ng += (pg.g - ng) * pressMix;
+            nb += (pg.b - nb) * pressMix;
+            const hotCore = pressBoost * core * 0.22;
+            nr += (255 - nr) * hotCore;
+            ng += (255 - ng) * hotCore;
+            nb += (255 - nb) * hotCore;
+          }
+
           const radialRay =
-            Math.pow(Math.max(0, Math.sin(dist * 0.13 - spin)), 2.2) *
-            bloom *
-            0.29;
+            Math.pow(Math.max(0, Math.sin(dist * 0.09 - spin)), 3.5) *
+            softBloom *
+            0.22;
           const angularRay =
-            Math.pow(Math.max(0, Math.cos(angle * 2.5 - spin)), 3) *
-            bloom *
-            0.11;
+            Math.pow(Math.max(0, Math.cos(angle * 2.5 - spin)), 4) *
+            softBloom *
+            0.08;
           const lightRay = radialRay + angularRay;
           nr += (255 - nr) * lightRay;
           ng += (255 - ng) * lightRay;
           nb += (255 - nb) * lightRay;
 
-          const mix = bloom > 1 ? 1 : bloom;
+          const mix = softBloom > 1 ? 1 : softBloom;
           dr += (nr - baseR) * mix;
           dg += (ng - baseG) * mix;
           db += (nb - baseB) * mix;
@@ -346,16 +373,25 @@
     ctx.putImageData(imageData, 0, 0);
   }
 
-  function tick() {
+  function tick(time) {
+    animTime = time * 0.001;
+
     const prevIntensity = intensity;
-    const fadeEase = prefersReducedMotion ? 1 : 0.32;
+    const prevPressBoost = pressBoost;
+    const fadeEase = prefersReducedMotion ? 1 : 0.42;
     intensity += (targetIntensity - intensity) * fadeEase;
+    pressBoost += (targetPressBoost - pressBoost) * fadeEase;
+
+    const bloomActive =
+      intensity > 0.01 || pointers.size > 0 || targetIntensity > 0;
 
     const stillFading =
       Math.abs(intensity - prevIntensity) > 0.004 ||
-      Math.abs(targetIntensity - intensity) > 0.004;
+      Math.abs(targetIntensity - intensity) > 0.004 ||
+      Math.abs(pressBoost - prevPressBoost) > 0.004 ||
+      Math.abs(targetPressBoost - pressBoost) > 0.004;
 
-    if (dirty || stillFading) {
+    if (dirty || stillFading || (bloomActive && !prefersReducedMotion)) {
       draw();
       dirty = false;
     }
@@ -364,15 +400,78 @@
       fadeTouches = [];
     }
 
-    if (dirty || stillFading || pointers.size > 0) {
+    if (dirty || stillFading || bloomActive) {
       rafId = requestAnimationFrame(tick);
     } else {
       drawing = false;
     }
   }
 
+  function trackPointer(event, norm) {
+    let ptr = pointers.get(event.pointerId);
+    if (!ptr) {
+      pointers.set(event.pointerId, {
+        x: norm.x,
+        y: norm.y,
+        lastX: norm.x,
+        lastY: norm.y,
+      });
+    } else {
+      advanceSpin(norm.x, norm.y, ptr.lastX, ptr.lastY);
+      ptr.lastX = norm.x;
+      ptr.lastY = norm.y;
+      ptr.x = norm.x;
+      ptr.y = norm.y;
+    }
+    targetIntensity = 1;
+    requestDraw();
+  }
+
+  function onPointerEnter(event) {
+    if (event.pointerType !== "mouse") return;
+    const norm = normFromClient(event.clientX, event.clientY);
+    if (!norm) return;
+    trackPointer(event, norm);
+  }
+
+  function onPointerMove(event) {
+    const norm = normFromClient(event.clientX, event.clientY);
+    if (!norm) return;
+
+    if (event.pointerType === "mouse") {
+      trackPointer(event, norm);
+      return;
+    }
+
+    const ptr = pointers.get(event.pointerId);
+    if (!ptr) return;
+    advanceSpin(norm.x, norm.y, ptr.lastX, ptr.lastY);
+    ptr.lastX = norm.x;
+    ptr.lastY = norm.y;
+    ptr.x = norm.x;
+    ptr.y = norm.y;
+    requestDraw();
+  }
+
+  function onPointerLeave(event) {
+    if (event.pointerType !== "mouse") return;
+    if (!pointers.has(event.pointerId)) return;
+    if (pointers.size === 1) fadeTouches = snapshotTouches();
+    pointers.delete(event.pointerId);
+    if (pointers.size === 0) targetIntensity = 0;
+    requestDraw();
+  }
+
   function onPointerDown(event) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
+    pressedCount++;
+    targetPressBoost = 1;
+
+    if (event.pointerType === "mouse") {
+      requestDraw();
+      return;
+    }
+
     hero.setPointerCapture(event.pointerId);
     const norm = normFromClient(event.clientX, event.clientY);
     if (!norm) return;
@@ -386,20 +485,16 @@
     requestDraw();
   }
 
-  function onPointerMove(event) {
-    const ptr = pointers.get(event.pointerId);
-    if (!ptr) return;
-    const norm = normFromClient(event.clientX, event.clientY);
-    if (!norm) return;
-    advanceSpin(norm.x, norm.y, ptr.lastX, ptr.lastY);
-    ptr.lastX = norm.x;
-    ptr.lastY = norm.y;
-    ptr.x = norm.x;
-    ptr.y = norm.y;
-    requestDraw();
-  }
-
   function onPointerEnd(event) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    pressedCount = Math.max(0, pressedCount - 1);
+    targetPressBoost = pressedCount > 0 ? 1 : 0;
+
+    if (event.pointerType === "mouse") {
+      requestDraw();
+      return;
+    }
+
     if (!pointers.has(event.pointerId)) return;
     if (pointers.size === 1) fadeTouches = snapshotTouches();
     pointers.delete(event.pointerId);
@@ -411,6 +506,8 @@
     requestDraw();
   }
 
+  hero.addEventListener("pointerenter", onPointerEnter, { passive: true });
+  hero.addEventListener("pointerleave", onPointerLeave, { passive: true });
   hero.addEventListener("pointerdown", onPointerDown, { passive: true });
   hero.addEventListener("pointermove", onPointerMove, { passive: true });
   hero.addEventListener("pointerup", onPointerEnd, { passive: true });
