@@ -276,11 +276,13 @@
 
           anyBloom = true;
           const core = Math.exp(-distSq / coreRSq) * effect;
+          const centerBlend = 1 - Math.exp(-distSq / (bloomR * 0.11 * (bloomR * 0.11)));
           const len = dist || 1;
           const warpPush =
             bloom * 58 +
             Math.max(0, Math.sin(dist * 0.1 - spin)) * bloom * 8;
-          totalWarp += (dx / len) * warpPush;
+          const warpFade = 1 - Math.exp(-distSq / (bloomR * 0.09 * (bloomR * 0.09)));
+          totalWarp += (dx / len) * warpPush * warpFade;
 
           const angle = Math.atan2(dy, dx);
           const binF = ((angle / Math.PI + 1) * 0.5 * ANGLE_BINS) % ANGLE_BINS;
@@ -300,13 +302,15 @@
           let ng = baseC.g;
           let nb = baseC.b;
 
-          const colorMix = softBloom * 0.72;
+          const colorMix = softBloom * 0.72 * (0.2 + 0.8 * centerBlend);
           nr += (ar - nr) * colorMix;
           ng += (ag - ng) * colorMix;
           nb += (ab - nb) * colorMix;
 
+          const glow = bloom * 0.55 + core * 0.45;
           const brighten =
-            softBloom * (0.68 + pressBoost * 0.1) + core * (0.58 + pressBoost * 0.08);
+            softBloom * (0.68 + pressBoost * 0.1) +
+            glow * (0.58 + pressBoost * 0.08);
           nr += (255 - nr) * brighten;
           ng += (255 - ng) * brighten;
           nb += (255 - nb) * brighten;
@@ -316,11 +320,12 @@
             const smoothT = radialT * radialT * (3 - 2 * radialT);
             const sweep = smoothT * 0.7 + 0.3 * xi;
             const pg = sampleGradient(sweep);
-            const pressMix = pressBoost * softBloom * 0.38 * (1 - smoothT * 0.5);
+            const pressMix =
+              pressBoost * softBloom * 0.38 * centerBlend * (0.35 + 0.65 * smoothT);
             nr += (pg.r - nr) * pressMix;
             ng += (pg.g - ng) * pressMix;
             nb += (pg.b - nb) * pressMix;
-            const hotCore = pressBoost * core * 0.22;
+            const hotCore = pressBoost * softBloom * 0.1 * centerBlend;
             nr += (255 - nr) * hotCore;
             ng += (255 - ng) * hotCore;
             nb += (255 - nb) * hotCore;
@@ -333,7 +338,8 @@
           const angularRay =
             Math.pow(Math.max(0, Math.cos(angle * 2.5 - spin)), 4) *
             softBloom *
-            0.08;
+            0.08 *
+            centerBlend;
           const lightRay = radialRay + angularRay;
           nr += (255 - nr) * lightRay;
           ng += (255 - ng) * lightRay;
