@@ -1,0 +1,110 @@
+/* Synxthesia landing — minimal static site */
+
+:root {
+  --color-bg: #1a1a1a;
+  --color-logo-frame: #141414;
+  --color-text-on-gradient: #292623;
+  --gradient-hero: linear-gradient(
+    90deg,
+    #ff8070 0%,
+    #ff9a8b 18%,
+    #e8a0c8 40%,
+    #b2a2d9 55%,
+    #8ecae8 75%,
+    #50d5c7 100%
+  );
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: "Averia Libre", Georgia, serif;
+  background: var(--color-bg);
+  color: var(--color-text-on-gradient);
+}
+
+.page {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.logo-section {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  padding: 2.5rem 1.5rem 2rem;
+}
+
+.logo-frame {
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-logo-frame);
+  border-radius: 4px;
+}
+
+.logo-mark {
+  display: block;
+  width: 120px;
+  height: 120px;
+}
+
+.hero {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+  /* Static fallback before canvas paints */
+  background: var(--gradient-hero);
+  cursor: crosshair;
+}
+
+.hero-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: fill;
+}
+
+.wordmark {
+  position: relative;
+  z-index: 1;
+  font-family: "Averia Libre", Georgia, serif;
+  font-size: clamp(2rem, 7vw, 4rem);
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: var(--color-text-on-gradient);
+  text-transform: lowercase;
+  pointer-events: none;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero {
+    cursor: default;
+  }
+}
