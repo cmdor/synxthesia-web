@@ -148,12 +148,16 @@
     return Array.from(pointers.values()).map((p) => ({ x: p.x, y: p.y }));
   }
 
-  function requestDraw() {
-    dirty = true;
+  function ensureLoop() {
     if (!drawing) {
       drawing = true;
       rafId = requestAnimationFrame(tick);
     }
+  }
+
+  function requestDraw() {
+    dirty = true;
+    ensureLoop();
   }
 
   function resize() {
