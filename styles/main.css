@@ -103,6 +103,12 @@ body {
   user-select: none;
 }
 
+@media (pointer: coarse) {
+  .hero-canvas {
+    image-rendering: auto;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero {
     cursor: default;

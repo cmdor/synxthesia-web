@@ -18,7 +18,9 @@
     { t: 1, r: 80, g: 213, b: 199 },
   ];
 
-  const renderScale = isCoarse ? 0.26 : 0.38;
+  const renderScale = isCoarse ? 0.34 : 0.38;
+  const renderScaleX = isCoarse ? 0.44 : renderScale;
+  const renderScaleY = isCoarse ? 0.28 : renderScale;
   const ANGLE_BINS = 64;
 
   /** @type {Map<number, { x: number, y: number, lastX: number, lastY: number }>} */
@@ -40,12 +42,12 @@
   let drawing = false;
 
   let imageData = null;
-  /** @type {Uint8ClampedArray | null} */
-  let gradR = null;
-  /** @type {Uint8ClampedArray | null} */
-  let gradG = null;
-  /** @type {Uint8ClampedArray | null} */
-  let gradB = null;
+  /** @type {HTMLCanvasElement | null} */
+  let bufferCanvas = null;
+  /** @type {CanvasRenderingContext2D | null} */
+  let bufferCtx = null;
+  let displayW = 0;
+  let displayH = 0;
   /** @type {Float32Array | null} */
   let accentTable = null;
 
@@ -114,21 +116,45 @@
     }
   }
 
-  function buildGradientLut() {
-    gradR = new Uint8ClampedArray(renderW);
-    gradG = new Uint8ClampedArray(renderW);
-    gradB = new Uint8ClampedArray(renderW);
-    const denom = Math.max(1, renderW - 1);
-    for (let x = 0; x < renderW; x++) {
-      const c = sampleGradient(x / denom);
-      gradR[x] = c.r;
-      gradG[x] = c.g;
-      gradB[x] = c.b;
+  function sampleGradAt(t) {
+    const c = sampleGradient(Math.max(0, Math.min(1, t)));
+    return { r: c.r, g: c.g, b: c.b };
+  }
+
+  function ensureBuffer() {
+    if (!bufferCanvas) {
+      bufferCanvas = document.createElement("canvas");
+      bufferCtx = bufferCanvas.getContext("2d");
+    }
+    if (bufferCanvas.width !== renderW || bufferCanvas.height !== renderH) {
+      bufferCanvas.width = renderW;
+      bufferCanvas.height = renderH;
+      imageData = bufferCtx.createImageData(renderW, renderH);
     }
   }
 
-  function lutIndex(t) {
-    return Math.max(0, Math.min(renderW - 1, (t * (renderW - 1)) | 0));
+  function presentFrame() {
+    if (!bufferCtx || !imageData) return;
+    bufferCtx.putImageData(imageData, 0, 0);
+
+    if (isCoarse) {
+      if (canvas.width !== displayW || canvas.height !== displayH) {
+        canvas.width = displayW;
+        canvas.height = displayH;
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(bufferCanvas, 0, 0, displayW, displayH);
+      return;
+    }
+
+    if (canvas.width !== renderW || canvas.height !== renderH) {
+      canvas.width = renderW;
+      canvas.height = renderH;
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(bufferCanvas, 0, 0);
   }
 
   function normFromClient(clientX, clientY) {
@@ -165,18 +191,20 @@
   }
 
   function paintFlatGradient() {
-    if (!imageData || !gradR) return;
+    if (!imageData) return;
     const data = imageData.data;
+    const denom = Math.max(1, renderW - 1);
     for (let y = 0; y < renderH; y++) {
       let row = y * renderW * 4;
       for (let x = 0; x < renderW; x++) {
-        data[row++] = gradR[x];
-        data[row++] = gradG[x];
-        data[row++] = gradB[x];
+        const c = sampleGradAt(x / denom);
+        data[row++] = c.r;
+        data[row++] = c.g;
+        data[row++] = c.b;
         data[row++] = 255;
       }
     }
-    ctx.putImageData(imageData, 0, 0);
+    presentFrame();
   }
 
   function resize() {
@@ -187,20 +215,26 @@
     }
     const cssW = Math.max(1, Math.floor(heroRect.width));
     const cssH = Math.max(1, Math.floor(heroRect.height));
-    renderW = Math.max(1, Math.floor(cssW * renderScale));
-    renderH = Math.max(1, Math.floor(cssH * renderScale));
-    canvas.width = renderW;
-    canvas.height = renderH;
+    displayW = cssW;
+    displayH = cssH;
+    renderW = Math.max(1, Math.floor(cssW * renderScaleX));
+    renderH = Math.max(1, Math.floor(cssH * renderScaleY));
+    ensureBuffer();
+    if (!isCoarse) {
+      canvas.width = renderW;
+      canvas.height = renderH;
+    } else {
+      canvas.width = displayW;
+      canvas.height = displayH;
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = true;
-    imageData = ctx.createImageData(renderW, renderH);
-    buildGradientLut();
     paintFlatGradient();
     dirty = false;
   }
 
   function draw() {
-    if (!imageData || !gradR) return;
+    if (!imageData) return;
 
     const effect = prefersReducedMotion ? 0 : intensity;
     const data = imageData.data;
@@ -236,9 +270,11 @@
     for (let y = 0; y < renderH; y++) {
       let row = y * renderW * 4;
       for (let x = 0; x < renderW; x++) {
-        const baseR = gradR[x];
-        const baseG = gradG[x];
-        const baseB = gradB[x];
+        const xi = x / denom;
+        const base = sampleGradAt(xi);
+        const baseR = base.r;
+        const baseG = base.g;
+        const baseB = base.b;
 
         let nearTouch = false;
         for (let t = 0; t < touchCount; t++) {
@@ -295,7 +331,6 @@
           const ag = accentTable[i0 + 1] * (1 - bu) + accentTable[i1 + 1] * bu;
           const ab = accentTable[i0 + 2] * (1 - bu) + accentTable[i1 + 2] * bu;
 
-          const xi = x / denom;
           const softBloom = bloom * bloom * (3 - 2 * bloom);
           const baseC = sampleGradient(xi);
           let nr = baseC.r;
@@ -364,10 +399,10 @@
         let b = baseB + db;
 
         const srcX = x - totalWarp;
-        const wi = lutIndex(srcX / denom);
-        r = r * invWarpBlend + gradR[wi] * warpBlend;
-        g = g * invWarpBlend + gradG[wi] * warpBlend;
-        b = b * invWarpBlend + gradB[wi] * warpBlend;
+        const warp = sampleGradAt(srcX / denom);
+        r = r * invWarpBlend + warp.r * warpBlend;
+        g = g * invWarpBlend + warp.g * warpBlend;
+        b = b * invWarpBlend + warp.b * warpBlend;
 
         data[row++] = r > 255 ? 255 : r < 0 ? 0 : r | 0;
         data[row++] = g > 255 ? 255 : g < 0 ? 0 : g | 0;
@@ -376,7 +411,7 @@
       }
     }
 
-    ctx.putImageData(imageData, 0, 0);
+    presentFrame();
   }
 
   function tick(time) {
