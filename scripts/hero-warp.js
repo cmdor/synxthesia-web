@@ -3,7 +3,7 @@
   const canvas = document.querySelector(".hero-canvas");
   if (!hero || !canvas) return;
 
-  const ctx = canvas.getContext("2d", { alpha: false });
+  const ctx = canvas.getContext("2d");
   const prefersReducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
   ).matches;
@@ -160,8 +160,27 @@
     ensureLoop();
   }
 
+  function paintFlatGradient() {
+    if (!imageData || !gradR) return;
+    const data = imageData.data;
+    for (let y = 0; y < renderH; y++) {
+      let row = y * renderW * 4;
+      for (let x = 0; x < renderW; x++) {
+        data[row++] = gradR[x];
+        data[row++] = gradG[x];
+        data[row++] = gradB[x];
+        data[row++] = 255;
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+
   function resize() {
     heroRect = hero.getBoundingClientRect();
+    if (heroRect.width < 2 || heroRect.height < 2) {
+      requestAnimationFrame(resize);
+      return;
+    }
     const cssW = Math.max(1, Math.floor(heroRect.width));
     const cssH = Math.max(1, Math.floor(heroRect.height));
     renderW = Math.max(1, Math.floor(cssW * renderScale));
@@ -172,7 +191,8 @@
     ctx.imageSmoothingEnabled = true;
     imageData = ctx.createImageData(renderW, renderH);
     buildGradientLut();
-    dirty = true;
+    paintFlatGradient();
+    dirty = false;
   }
 
   function draw() {
@@ -181,13 +201,13 @@
     const effect = prefersReducedMotion ? 0 : intensity;
     const data = imageData.data;
     const minDim = Math.min(renderW, renderH);
-    const bloomR = minDim * 0.105;
+    const bloomR = minDim * 0.184;
     const bloomRSq = bloomR * bloomR;
-    const coreRSq = (minDim * 0.04) ** 2;
-    const margin = bloomR * 1.15;
+    const coreRSq = (minDim * 0.07) ** 2;
     const spin = spinAngle;
     const skipDistSq = bloomRSq * 6.25;
-    const warpBlendBase = 0.35;
+    const warpBlend = 0.35;
+    const invWarpBlend = 1 - warpBlend;
     const denom = Math.max(1, renderW - 1);
 
     buildAccentTable(spin);
@@ -197,62 +217,47 @@
     const touchCount = touchSrc.length;
 
     if (effect <= 0 || touchCount === 0) {
-      for (let y = 0; y < renderH; y++) {
-        let row = y * renderW * 4;
-        for (let x = 0; x < renderW; x++) {
-          data[row++] = gradR[x];
-          data[row++] = gradG[x];
-          data[row++] = gradB[x];
-          data[row++] = 255;
-        }
-      }
-      ctx.putImageData(imageData, 0, 0);
+      paintFlatGradient();
       return;
     }
 
-    const boxes = new Array(touchCount);
     const mxArr = new Float32Array(touchCount);
     const myArr = new Float32Array(touchCount);
     for (let t = 0; t < touchCount; t++) {
-      const mx = touchSrc[t].x * renderW;
-      const my = touchSrc[t].y * renderH;
-      mxArr[t] = mx;
-      myArr[t] = my;
-      boxes[t] = {
-        x0: Math.max(0, (mx - margin) | 0),
-        x1: Math.min(renderW - 1, (mx + margin) | 0),
-        y0: Math.max(0, (my - margin) | 0),
-        y1: Math.min(renderH - 1, (my + margin) | 0),
-      };
+      mxArr[t] = touchSrc[t].x * renderW;
+      myArr[t] = touchSrc[t].y * renderH;
     }
-
-    const warpBlend = Math.min(1, touchCount * warpBlendBase);
-    const invWarpBlend = 1 - warpBlend;
 
     for (let y = 0; y < renderH; y++) {
       let row = y * renderW * 4;
       for (let x = 0; x < renderW; x++) {
-        let inZone = false;
+        const baseR = gradR[x];
+        const baseG = gradG[x];
+        const baseB = gradB[x];
+
+        let nearTouch = false;
         for (let t = 0; t < touchCount; t++) {
-          const box = boxes[t];
-          if (x >= box.x0 && x <= box.x1 && y >= box.y0 && y <= box.y1) {
-            inZone = true;
+          const dx = x - mxArr[t];
+          const dy = y - myArr[t];
+          if (dx * dx + dy * dy <= skipDistSq) {
+            nearTouch = true;
             break;
           }
         }
 
-        if (!inZone) {
-          data[row++] = gradR[x];
-          data[row++] = gradG[x];
-          data[row++] = gradB[x];
+        if (!nearTouch) {
+          data[row++] = baseR;
+          data[row++] = baseG;
+          data[row++] = baseB;
           data[row++] = 255;
           continue;
         }
 
-        let r = gradR[x];
-        let g = gradG[x];
-        let b = gradB[x];
+        let dr = 0;
+        let dg = 0;
+        let db = 0;
         let totalWarp = 0;
+        let anyBloom = false;
 
         for (let t = 0; t < touchCount; t++) {
           const dx = x - mxArr[t];
@@ -264,6 +269,7 @@
           const bloom = Math.exp(-distSq / bloomRSq) * effect;
           if (bloom < 0.002) continue;
 
+          anyBloom = true;
           const core = Math.exp(-distSq / coreRSq) * effect;
           const len = dist || 1;
           const warpPush =
@@ -307,10 +313,22 @@
           nb += (255 - nb) * lightRay;
 
           const mix = bloom > 1 ? 1 : bloom;
-          r += (nr - r) * mix;
-          g += (ng - g) * mix;
-          b += (nb - b) * mix;
+          dr += (nr - baseR) * mix;
+          dg += (ng - baseG) * mix;
+          db += (nb - baseB) * mix;
         }
+
+        if (!anyBloom) {
+          data[row++] = baseR;
+          data[row++] = baseG;
+          data[row++] = baseB;
+          data[row++] = 255;
+          continue;
+        }
+
+        let r = baseR + dr;
+        let g = baseG + dg;
+        let b = baseB + db;
 
         const srcX = x - totalWarp;
         const wi = lutIndex(srcX / denom);
@@ -402,6 +420,7 @@
   const ro = new ResizeObserver(resize);
   ro.observe(hero);
   resize();
+  window.addEventListener("load", resize, { once: true });
   requestDraw();
 
   window.addEventListener("beforeunload", () => {

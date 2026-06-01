@@ -32,6 +32,7 @@ body {
 body {
   font-family: "Averia Libre", Georgia, serif;
   color: var(--color-text-on-gradient);
+  background: var(--gradient-hero);
 }
 
 .page {
