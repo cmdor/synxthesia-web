@@ -103,6 +103,56 @@ body {
   user-select: none;
 }
 
+.contact-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem 0.6rem;
+  margin-top: clamp(0.5rem, 1.5vh, 1rem);
+  pointer-events: auto;
+}
+
+.contact-link {
+  font-family: inherit;
+  font-size: clamp(0.85rem, 2.8vw, 1rem);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--color-text-on-gradient);
+  text-decoration: none;
+  text-transform: lowercase;
+}
+
+.contact-link:hover,
+.contact-link:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.contact-link--icon {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.contact-link--icon:hover,
+.contact-link--icon:focus-visible {
+  text-decoration: none;
+  opacity: 0.72;
+}
+
+.contact-icon {
+  display: block;
+  width: clamp(1rem, 3.2vw, 1.125rem);
+  height: clamp(1rem, 3.2vw, 1.125rem);
+}
+
+.contact-sep {
+  color: var(--color-text-on-gradient);
+  opacity: 0.45;
+  user-select: none;
+}
+
 @media (pointer: coarse) {
   .hero-canvas {
     image-rendering: auto;
