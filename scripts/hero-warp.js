@@ -9,6 +9,20 @@
   ).matches;
   const isCoarse = window.matchMedia("(pointer: coarse)").matches;
 
+  // Brand palette — bloom accents only (source: brand/tokens/tokens.yaml)
+  const brandCream = { r: 255, g: 248, b: 240 };
+  const brandColors = [
+    { r: 255, g: 123, b: 95 }, // coral
+    { r: 255, g: 184, b: 140 }, // peach
+    { r: 255, g: 179, b: 217 }, // rose
+    { r: 255, g: 105, b: 180 }, // pink
+    { r: 177, g: 156, b: 217 }, // lavender
+    { r: 155, g: 126, b: 222 }, // violet
+    { r: 135, g: 206, b: 235 }, // sky
+    { r: 141, g: 232, b: 216 }, // mint
+    { r: 78, g: 205, b: 196 }, // teal
+  ];
+
   const stops = [
     { t: 0, r: 255, g: 128, b: 112 },
     { t: 0.18, r: 255, g: 154, b: 139 },
@@ -51,6 +65,22 @@
   /** @type {Float32Array | null} */
   let accentTable = null;
 
+  function sampleBrandPalette(t) {
+    const n = brandColors.length;
+    const wrapped = ((t % 1) + 1) % 1;
+    const scaled = wrapped * n;
+    const i0 = scaled | 0;
+    const i1 = (i0 + 1) % n;
+    const u = scaled - i0;
+    const a = brandColors[i0];
+    const b = brandColors[i1];
+    return {
+      r: a.r + (b.r - a.r) * u,
+      g: a.g + (b.g - a.g) * u,
+      b: a.b + (b.b - a.b) * u,
+    };
+  }
+
   function sampleGradient(t) {
     if (t <= stops[0].t) return stops[0];
     if (t >= stops[stops.length - 1].t) return stops[stops.length - 1];
@@ -69,46 +99,11 @@
     return stops[stops.length - 1];
   }
 
-  function hslToRgb(h, s, l) {
-    const c = (1 - Math.abs(2 * l - 1)) * s;
-    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-    const m = l - c / 2;
-    let r = 0;
-    let g = 0;
-    let b = 0;
-    if (h < 60) {
-      r = c;
-      g = x;
-    } else if (h < 120) {
-      r = x;
-      g = c;
-    } else if (h < 180) {
-      g = c;
-      b = x;
-    } else if (h < 240) {
-      g = x;
-      b = c;
-    } else if (h < 300) {
-      r = x;
-      b = c;
-    } else {
-      r = c;
-      b = x;
-    }
-    return {
-      r: (r + m) * 255,
-      g: (g + m) * 255,
-      b: (b + m) * 255,
-    };
-  }
-
   function buildAccentTable(spin) {
     if (!accentTable) accentTable = new Float32Array(ANGLE_BINS * 3);
     for (let b = 0; b < ANGLE_BINS; b++) {
-      const angle = (b / ANGLE_BINS) * Math.PI * 2;
-      const hue =
-        ((angle * 57.2958 + spin * 57.2958 + 180) % 360 + 360) % 360;
-      const rgb = hslToRgb(hue, 0.88, 0.66);
+      const angle = (b / ANGLE_BINS) * Math.PI * 2 + spin;
+      const rgb = sampleBrandPalette(angle / (Math.PI * 2));
       const i = b * 3;
       accentTable[i] = rgb.r;
       accentTable[i + 1] = rgb.g;
@@ -312,7 +307,9 @@
 
           anyBloom = true;
           const core = Math.exp(-distSq / coreRSq) * effect;
-          const centerBlend = 1 - Math.exp(-distSq / (bloomR * 0.11 * (bloomR * 0.11)));
+          const centerR = bloomR * 0.22;
+          const centerBlend = 1 - Math.exp(-distSq / (centerR * centerR));
+          const centerEase = centerBlend * centerBlend * (3 - 2 * centerBlend);
           const len = dist || 1;
           const warpPush =
             bloom * 58 +
@@ -331,54 +328,75 @@
           const ag = accentTable[i0 + 1] * (1 - bu) + accentTable[i1 + 1] * bu;
           const ab = accentTable[i0 + 2] * (1 - bu) + accentTable[i1 + 2] * bu;
 
+          const br = brandCream.r * (1 - centerEase) + ar * centerEase;
+          const bg = brandCream.g * (1 - centerEase) + ag * centerEase;
+          const bb = brandCream.b * (1 - centerEase) + ab * centerEase;
+
+          const liftR = 255 * centerEase + brandCream.r * (1 - centerEase);
+          const liftG = 255 * centerEase + brandCream.g * (1 - centerEase);
+          const liftB = 255 * centerEase + brandCream.b * (1 - centerEase);
+
           const softBloom = bloom * bloom * (3 - 2 * bloom);
-          const baseC = sampleGradient(xi);
+          const chromaOff = Math.sin(angle + spin * 0.8) * softBloom * 0.015 * centerEase;
+          const baseC = sampleGradient(Math.max(0, Math.min(1, xi + chromaOff)));
           let nr = baseC.r;
           let ng = baseC.g;
           let nb = baseC.b;
 
-          const colorMix = softBloom * 0.72 * (0.2 + 0.8 * centerBlend);
-          nr += (ar - nr) * colorMix;
-          ng += (ag - ng) * colorMix;
-          nb += (ab - nb) * colorMix;
+          const colorMix = softBloom * 0.62 * (0.45 + 0.55 * centerEase);
+          nr += (br - nr) * colorMix;
+          ng += (bg - ng) * colorMix;
+          nb += (bb - nb) * colorMix;
 
           const glow = bloom * 0.55 + core * 0.45;
           const brighten =
-            softBloom * (0.68 + pressBoost * 0.1) +
-            glow * (0.58 + pressBoost * 0.08);
-          nr += (255 - nr) * brighten;
-          ng += (255 - ng) * brighten;
-          nb += (255 - nb) * brighten;
+            softBloom * (0.36 + pressBoost * 0.05) +
+            glow * (0.26 + pressBoost * 0.04);
+          nr +=
+            (br - nr) * brighten * 0.28 +
+            (baseC.r - nr) * brighten * 0.12 +
+            (liftR - nr) * brighten * 0.42;
+          ng +=
+            (bg - ng) * brighten * 0.28 +
+            (baseC.g - ng) * brighten * 0.12 +
+            (liftG - ng) * brighten * 0.42;
+          nb +=
+            (bb - nb) * brighten * 0.28 +
+            (baseC.b - nb) * brighten * 0.12 +
+            (liftB - nb) * brighten * 0.42;
 
           if (pressBoost > 0) {
             const radialT = Math.min(1, dist / (bloomR * 1.1));
             const smoothT = radialT * radialT * (3 - 2 * radialT);
-            const sweep = smoothT * 0.7 + 0.3 * xi;
+            const sweep = smoothT * 0.65 + 0.35 * xi;
             const pg = sampleGradient(sweep);
+            const pressR = pg.r * centerEase + brandCream.r * (1 - centerEase);
+            const pressG = pg.g * centerEase + brandCream.g * (1 - centerEase);
+            const pressB = pg.b * centerEase + brandCream.b * (1 - centerEase);
             const pressMix =
-              pressBoost * softBloom * 0.38 * centerBlend * (0.35 + 0.65 * smoothT);
-            nr += (pg.r - nr) * pressMix;
-            ng += (pg.g - ng) * pressMix;
-            nb += (pg.b - nb) * pressMix;
-            const hotCore = pressBoost * softBloom * 0.1 * centerBlend;
-            nr += (255 - nr) * hotCore;
-            ng += (255 - ng) * hotCore;
-            nb += (255 - nb) * hotCore;
+              pressBoost * softBloom * 0.32 * (0.5 + 0.5 * centerEase) * (0.35 + 0.65 * smoothT);
+            nr += (pressR - nr) * pressMix;
+            ng += (pressG - ng) * pressMix;
+            nb += (pressB - nb) * pressMix;
+            const hotCore = pressBoost * softBloom * 0.07 * (0.45 + 0.55 * centerEase);
+            nr += (pressR - nr) * hotCore * 0.45 + (brandCream.r - nr) * hotCore * 0.35;
+            ng += (pressG - ng) * hotCore * 0.45 + (brandCream.g - ng) * hotCore * 0.35;
+            nb += (pressB - nb) * hotCore * 0.45 + (brandCream.b - nb) * hotCore * 0.35;
           }
 
           const radialRay =
             Math.pow(Math.max(0, Math.sin(dist * 0.09 - spin)), 3.5) *
             softBloom *
-            0.22;
+            0.1;
           const angularRay =
             Math.pow(Math.max(0, Math.cos(angle * 2.5 - spin)), 4) *
             softBloom *
-            0.08 *
-            centerBlend;
+            0.03 *
+            centerEase;
           const lightRay = radialRay + angularRay;
-          nr += (255 - nr) * lightRay;
-          ng += (255 - ng) * lightRay;
-          nb += (255 - nb) * lightRay;
+          nr += (br - nr) * lightRay * 0.35 + (liftR - nr) * lightRay * 0.65;
+          ng += (bg - ng) * lightRay * 0.35 + (liftG - ng) * lightRay * 0.65;
+          nb += (bb - nb) * lightRay * 0.35 + (liftB - nb) * lightRay * 0.65;
 
           const mix = softBloom > 1 ? 1 : softBloom;
           dr += (nr - baseR) * mix;

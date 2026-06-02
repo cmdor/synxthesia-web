@@ -42,6 +42,7 @@ body {
 
 .hero {
   position: relative;
+  isolation: isolate;
   width: 100%;
   height: 100%;
   display: flex;
@@ -51,12 +52,13 @@ body {
   overflow: hidden;
   touch-action: none;
   background: var(--gradient-hero);
-  cursor: crosshair;
+  cursor: default;
 }
 
 .hero-canvas {
   position: absolute;
   inset: 0;
+  z-index: 0;
   width: 100%;
   height: 100%;
   display: block;
@@ -65,7 +67,8 @@ body {
 
 .brand-stack {
   position: relative;
-  z-index: 2;
+  z-index: 10;
+  transform: translateZ(0);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -74,6 +77,8 @@ body {
 }
 
 .logo-badge {
+  position: relative;
+  z-index: 1;
   width: var(--logo-size);
   height: var(--logo-size);
   flex-shrink: 0;
@@ -93,6 +98,8 @@ body {
 }
 
 .wordmark {
+  position: relative;
+  z-index: 1;
   font-family: "Averia Libre", Georgia, serif;
   font-size: clamp(2rem, 7vw, 4rem);
   font-weight: 400;
@@ -104,6 +111,8 @@ body {
 }
 
 .contact-links {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
