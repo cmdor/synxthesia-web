@@ -1,6 +1,19 @@
 # synxthesia-web
 
-Minimal static landing page for [synxthesia](https://synxthesia.com).
+Static landing page for [synxthesia](https://synxthesia.com).
+
+## Page structure
+
+The page is a single scrollable HTML file with four areas:
+
+| Section | Element id | Notes |
+|---|---|---|
+| Hero | _(none)_ | Full-viewport animated gradient canvas — keep as-is |
+| About | `#about` | Studio description — edit the two `<p>` tags freely |
+| Products | `#products` | One `.product-card` per product — duplicate the block to add more |
+| Contact | `#contact` | Email + LinkedIn — update `href` values as needed |
+
+All copy is in `index.html`. Styles for the scrollable sections are at the bottom of `styles/main.css` under the `Content sections` comment block.
 
 Brand source files (tokens, master logos) live in the sibling repo:
 

@@ -6,7 +6,7 @@
     <title>synxthesia</title>
     <meta
       name="description"
-      content="Synxthesia — software at the intersection of music, education, and technology."
+      content="Synxthesia LLC — a remote-first software studio building tools at the intersection of music, education, and technology. Home of `NoFret Intonation`."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -34,29 +34,73 @@
 
           <h1 class="wordmark">synxthesia</h1>
 
-          <nav class="contact-links" aria-label="Contact">
-            <!-- Replace href with your LinkedIn company page URL -->
-            <a
-              class="contact-link contact-link--icon"
-              href="https://www.linkedin.com/company/synxthesia/"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="LinkedIn"
-            >
-              <img
-                src="assets/linkedin.svg"
-                alt=""
-                class="contact-icon"
-                width="18"
-                height="18"
-              />
-            </a>
+          <nav class="site-nav" aria-label="Site navigation">
+            <a class="nav-link" href="#about">About</a>
             <span class="contact-sep" aria-hidden="true">·</span>
-            <a class="contact-link" href="mailto:hello@synxthesia.com">hello@synxthesia.com</a>
+            <a class="nav-link" href="#products">Products</a>
+            <span class="contact-sep" aria-hidden="true">·</span>
+            <a class="nav-link" href="#contact">Contact</a>
           </nav>
         </div>
+
+        <a class="scroll-hint" href="#about" aria-label="Scroll to content">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M4 7l6 6 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
       </section>
     </main>
     <script src="scripts/hero-warp.js" defer></script>
+
+    <!-- ── About ─────────────────────────────────────────── -->
+    <section class="content-section" id="about">
+      <h2 class="section-label">About</h2>
+
+      <p class="section-body">
+        Synxthesia is a small studio building tools at the intersection of music,
+        education, and technology. We take niche domains we care about and
+        build the tools we wished existed, then publish them so others can use them too.
+        Our core users are musicians, people picking up a new instrument, and the educators who teach them.
+      </p>
+    </section>
+
+    <!-- ── Products ──────────────────────────────────────── -->
+    <section class="content-section" id="products">
+      <h2 class="section-label">Products</h2>
+      <div class="product-card">
+        <div class="product-header">
+          <span class="product-name">NoFret Tuner</span>
+          <span class="product-status">In development</span>
+        </div>
+        <p class="product-desc">
+          A precision toolkit for fretless string players to build skills of playing in tune.
+          Features include real-time visual fingering guidance, drone generation, and notation
+          feedback grounded in just-intonation music theory. Available soon on iOS and Android.
+        </p>
+        <p class="product-stack">Flutter · iOS · Android</p>
+      </div>
+    </section>
+
+
+    <!-- ── Contact ────────────────────────────────────────── -->
+    <section class="content-section" id="contact">
+      <h2 class="section-label">Contact</h2>
+      <p class="section-body">
+        <a class="content-link" href="mailto:hello@synxthesia.com">hello@synxthesia.com</a>
+      </p>
+      <p class="section-body">
+        <a
+          class="content-link"
+          href="https://www.linkedin.com/company/synxthesia/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >LinkedIn</a>
+      </p>
+    </section>
+
+    <footer class="site-footer">
+      <p>© 2026 Synxthesia LLC</p>
+    </footer>
+
   </body>
 </html>
