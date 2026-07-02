@@ -12,6 +12,10 @@
     #8ecae8 75%,
     #50d5c7 100%
   );
+  --pastel-rose: #e8a0c8;
+  --pastel-lavender: #b2a2d9;
+  --pastel-sky: #8ecae8;
+  --pastel-mint: #50d5c7;
   --logo-size: clamp(4.5rem, 11vw, 5.75rem);
 }
 
@@ -162,6 +166,10 @@ body {
 }
 
 @media (pointer: coarse) {
+  .hero {
+    touch-action: pan-y;
+  }
+
   .hero-canvas {
     image-rendering: auto;
   }
@@ -187,7 +195,7 @@ body {
 
 .nav-link {
   font-family: "Averia Libre", Georgia, serif;
-  font-size: clamp(0.85rem, 2.8vw, 1rem);
+  font-size: clamp(1rem, 3.5vw, 1.2rem);
   font-weight: 400;
   letter-spacing: 0.04em;
   color: var(--color-text-on-gradient);
@@ -229,7 +237,7 @@ body {
 /* ── Content sections ──────────────────────────────────────────────────── */
 
 .content-section {
-  max-width: 640px;
+  max-width: min(960px, 90vw);
   margin: 0 auto;
   padding: 4rem 2rem;
   border-top: 1px solid rgba(41, 38, 35, 0.12);
@@ -241,10 +249,11 @@ body {
 
 .section-label {
   font-family: "Averia Libre", Georgia, serif;
-  font-size: 0.75rem;
+  font-size: clamp(1rem, 2.8vw, 1.35rem);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  text-align: left;
   color: rgba(41, 38, 35, 0.45);
   margin-bottom: 1.25rem;
 }
@@ -257,6 +266,34 @@ body {
 }
 
 .section-body:last-child {
+  margin-bottom: 0;
+}
+
+#about .about-body {
+  font-size: clamp(1.35rem, 4.5vw, 2rem);
+  line-height: 1.65;
+  margin-bottom: 1.25rem;
+}
+
+.pastel-highlight {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--pastel-rose) 38%, white),
+    color-mix(in srgb, var(--pastel-lavender) 42%, white),
+    color-mix(in srgb, var(--pastel-sky) 32%, white)
+  );
+  padding: 0.12em 0.4em;
+  border-radius: 0.3em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.about-highlight {
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.75rem;
+}
+
+.about-highlight .about-body:last-child {
   margin-bottom: 0;
 }
 
@@ -300,14 +337,20 @@ body {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(41, 38, 35, 0.5);
-  border: 1px solid rgba(41, 38, 35, 0.25);
+  color: #6b4f8a;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--pastel-rose) 40%, white),
+    color-mix(in srgb, var(--pastel-lavender) 45%, white),
+    color-mix(in srgb, var(--pastel-sky) 35%, white)
+  );
+  border: 1px solid color-mix(in srgb, var(--pastel-lavender) 55%, white);
   border-radius: 999px;
   padding: 2px 10px;
 }
 
 .product-desc {
-  font-size: 1rem;
+  font-size: clamp(1.05rem, 2.2vw, 1.15rem);
   line-height: 1.65;
   color: #292623;
   margin-bottom: 0.75rem;

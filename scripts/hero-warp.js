@@ -37,9 +37,13 @@
   const renderScaleY = isCoarse ? 0.28 : renderScale;
   const ANGLE_BINS = 64;
 
-  /** @type {Map<number, { x: number, y: number, lastX: number, lastY: number }>} */
+  /** @type {Map<number, { x: number, y: number, lastX: number, lastY: number, clientX: number, clientY: number }>} */
   const pointers = new Map();
+  const MOUSE_HOVER_ID = -1;
   let fadeTouches = [];
+  let mousePointerId = null;
+  let lastMouseClientX = -1;
+  let lastMouseClientY = -1;
 
   let renderW = 0;
   let renderH = 0;
@@ -152,12 +156,108 @@
     ctx.drawImage(bufferCanvas, 0, 0);
   }
 
-  function normFromClient(clientX, clientY) {
+  function refreshHeroRect() {
+    heroRect = hero.getBoundingClientRect();
+  }
+
+  function computeNorm(clientX, clientY) {
     if (heroRect.width <= 0 || heroRect.height <= 0) return null;
     return {
       x: Math.max(0, Math.min(1, (clientX - heroRect.left) / heroRect.width)),
       y: Math.max(0, Math.min(1, (clientY - heroRect.top) / heroRect.height)),
     };
+  }
+
+  function normFromClient(clientX, clientY) {
+    refreshHeroRect();
+    return computeNorm(clientX, clientY);
+  }
+
+  function isInsideHero(clientX, clientY) {
+    return (
+      clientX >= heroRect.left &&
+      clientX <= heroRect.right &&
+      clientY >= heroRect.top &&
+      clientY <= heroRect.bottom
+    );
+  }
+
+  function syncPointerFromClient(ptr, animate) {
+    if (!isInsideHero(ptr.clientX, ptr.clientY)) return false;
+    const norm = computeNorm(ptr.clientX, ptr.clientY);
+    if (!norm) return false;
+    if (animate) advanceSpin(norm.x, norm.y, ptr.lastX, ptr.lastY);
+    ptr.lastX = norm.x;
+    ptr.lastY = norm.y;
+    ptr.x = norm.x;
+    ptr.y = norm.y;
+    return true;
+  }
+
+  function syncAllPointers() {
+    refreshHeroRect();
+    for (const [id, ptr] of pointers.entries()) {
+      if (!syncPointerFromClient(ptr, false)) {
+        if (pointers.size === 1) fadeTouches = snapshotTouches();
+        pointers.delete(id);
+        if (id === mousePointerId) mousePointerId = null;
+      }
+    }
+    syncMouseHoverFromScroll();
+    if (pointers.size === 0) {
+      targetIntensity = 0;
+      fadeTouches = [];
+    }
+    requestDraw();
+  }
+
+  function rememberMouseClient(clientX, clientY) {
+    lastMouseClientX = clientX;
+    lastMouseClientY = clientY;
+  }
+
+  function clearSyntheticMousePointer() {
+    if (mousePointerId !== MOUSE_HOVER_ID || !pointers.has(MOUSE_HOVER_ID)) return;
+    if (pointers.size === 1) fadeTouches = snapshotTouches();
+    pointers.delete(MOUSE_HOVER_ID);
+    mousePointerId = null;
+  }
+
+  function syncMouseHoverFromScroll() {
+    if (isCoarse || prefersReducedMotion || lastMouseClientX < 0) return;
+
+    refreshHeroRect();
+    const inside = isInsideHero(lastMouseClientX, lastMouseClientY);
+
+    if (!inside) {
+      if (mousePointerId === MOUSE_HOVER_ID) clearSyntheticMousePointer();
+      return;
+    }
+
+    const norm = computeNorm(lastMouseClientX, lastMouseClientY);
+    if (!norm) return;
+
+    if (mousePointerId !== null && pointers.has(mousePointerId)) {
+      const ptr = pointers.get(mousePointerId);
+      ptr.clientX = lastMouseClientX;
+      ptr.clientY = lastMouseClientY;
+      syncPointerFromClient(ptr, false);
+      targetIntensity = 1;
+      fadeTouches = [];
+      return;
+    }
+
+    pointers.set(MOUSE_HOVER_ID, {
+      x: norm.x,
+      y: norm.y,
+      lastX: norm.x,
+      lastY: norm.y,
+      clientX: lastMouseClientX,
+      clientY: lastMouseClientY,
+    });
+    mousePointerId = MOUSE_HOVER_ID;
+    targetIntensity = 1;
+    fadeTouches = [];
   }
 
   function advanceSpin(nx, ny, lastX, lastY) {
@@ -203,7 +303,7 @@
   }
 
   function resize() {
-    heroRect = hero.getBoundingClientRect();
+    refreshHeroRect();
     if (heroRect.width < 2 || heroRect.height < 2) {
       requestAnimationFrame(resize);
       return;
@@ -467,6 +567,12 @@
   }
 
   function trackPointer(event, norm) {
+    if (event.pointerType === "mouse") {
+      rememberMouseClient(event.clientX, event.clientY);
+      clearSyntheticMousePointer();
+      mousePointerId = event.pointerId;
+    }
+
     let ptr = pointers.get(event.pointerId);
     if (!ptr) {
       pointers.set(event.pointerId, {
@@ -474,8 +580,12 @@
         y: norm.y,
         lastX: norm.x,
         lastY: norm.y,
+        clientX: event.clientX,
+        clientY: event.clientY,
       });
     } else {
+      ptr.clientX = event.clientX;
+      ptr.clientY = event.clientY;
       advanceSpin(norm.x, norm.y, ptr.lastX, ptr.lastY);
       ptr.lastX = norm.x;
       ptr.lastY = norm.y;
@@ -494,6 +604,10 @@
   }
 
   function onPointerMove(event) {
+    if (event.pointerType === "mouse") {
+      rememberMouseClient(event.clientX, event.clientY);
+    }
+
     const norm = normFromClient(event.clientX, event.clientY);
     if (!norm) return;
 
@@ -504,6 +618,8 @@
 
     const ptr = pointers.get(event.pointerId);
     if (!ptr) return;
+    ptr.clientX = event.clientX;
+    ptr.clientY = event.clientY;
     advanceSpin(norm.x, norm.y, ptr.lastX, ptr.lastY);
     ptr.lastX = norm.x;
     ptr.lastY = norm.y;
@@ -517,6 +633,7 @@
     if (!pointers.has(event.pointerId)) return;
     if (pointers.size === 1) fadeTouches = snapshotTouches();
     pointers.delete(event.pointerId);
+    if (event.pointerId === mousePointerId) mousePointerId = null;
     if (pointers.size === 0) targetIntensity = 0;
     requestDraw();
   }
@@ -539,6 +656,8 @@
       y: norm.y,
       lastX: norm.x,
       lastY: norm.y,
+      clientX: event.clientX,
+      clientY: event.clientY,
     });
     targetIntensity = 1;
     requestDraw();
@@ -565,6 +684,15 @@
     requestDraw();
   }
 
+  document.addEventListener(
+    "pointermove",
+    (event) => {
+      if (event.pointerType !== "mouse") return;
+      rememberMouseClient(event.clientX, event.clientY);
+    },
+    { passive: true },
+  );
+
   hero.addEventListener("pointerenter", onPointerEnter, { passive: true });
   hero.addEventListener("pointerleave", onPointerLeave, { passive: true });
   hero.addEventListener("pointerdown", onPointerDown, { passive: true });
@@ -572,6 +700,35 @@
   hero.addEventListener("pointerup", onPointerEnd, { passive: true });
   hero.addEventListener("pointercancel", onPointerEnd, { passive: true });
   hero.addEventListener("lostpointercapture", onPointerEnd, { passive: true });
+
+  window.addEventListener("scroll", syncAllPointers, { passive: true });
+  window.visualViewport?.addEventListener("scroll", syncAllPointers, {
+    passive: true,
+  });
+  window.visualViewport?.addEventListener("resize", syncAllPointers, {
+    passive: true,
+  });
+
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) {
+          pointers.clear();
+          fadeTouches = [];
+          targetIntensity = 0;
+          targetPressBoost = 0;
+          pressedCount = 0;
+          mousePointerId = null;
+          requestDraw();
+          continue;
+        }
+        syncMouseHoverFromScroll();
+        requestDraw();
+      }
+    },
+    { threshold: 0 },
+  );
+  io.observe(hero);
 
   const ro = new ResizeObserver(resize);
   ro.observe(hero);
@@ -582,5 +739,9 @@
   window.addEventListener("beforeunload", () => {
     cancelAnimationFrame(rafId);
     ro.disconnect();
+    io.disconnect();
+    window.removeEventListener("scroll", syncAllPointers);
+    window.visualViewport?.removeEventListener("scroll", syncAllPointers);
+    window.visualViewport?.removeEventListener("resize", syncAllPointers);
   });
 })();
