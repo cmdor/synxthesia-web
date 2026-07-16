@@ -319,9 +319,25 @@ body {
 
 .product-header {
   display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.product-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 1px 6px rgba(41, 38, 35, 0.18);
+}
+
+.product-title {
+  display: flex;
   align-items: baseline;
   gap: 0.75rem;
-  margin-bottom: 0.75rem;
   flex-wrap: wrap;
 }
 
@@ -360,6 +376,78 @@ body {
   font-size: 0.8rem;
   letter-spacing: 0.04em;
   color: rgba(41, 38, 35, 0.45);
+}
+
+/* ── Privacy dropdown ──────────────────────────────────────────────────── */
+
+.privacy-dropdown {
+  margin-top: 1.25rem;
+  border-top: 1px solid rgba(41, 38, 35, 0.12);
+  padding-top: 1rem;
+}
+
+.privacy-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  cursor: pointer;
+  list-style: none;
+  font-family: "Averia Libre", Georgia, serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #292623;
+}
+
+.privacy-summary::-webkit-details-marker {
+  display: none;
+}
+
+.privacy-summary:hover,
+.privacy-summary:focus-visible {
+  opacity: 0.7;
+}
+
+.privacy-chevron {
+  flex-shrink: 0;
+  color: rgba(41, 38, 35, 0.55);
+  transition: transform 0.2s ease;
+}
+
+.privacy-dropdown[open] .privacy-chevron {
+  transform: rotate(180deg);
+}
+
+.privacy-body {
+  margin-top: 0.9rem;
+}
+
+.privacy-updated {
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: rgba(41, 38, 35, 0.45);
+  margin-bottom: 0.9rem;
+}
+
+.privacy-heading {
+  font-family: "Averia Libre", Georgia, serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #292623;
+  margin: 1rem 0 0.35rem;
+}
+
+.privacy-text {
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: #292623;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .privacy-chevron {
+    transition: none;
+  }
 }
 
 /* ── Footer ────────────────────────────────────────────────────────────── */
